@@ -1,0 +1,85 @@
+name: CI-ML
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: "Środowisko docelowe (dev/prod)"
+        required: true
+        default: "dev"
+
+jobs:
+  ml:
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.target_env || 'dev' }}
+    runs-on: ubuntu-latest
+
+    env:
+      APP_NAME:        ${{ vars.APP_NAME }}
+      MODEL_STORAGE:   ${{ vars.MODEL_STORAGE }}
+      PYTHON_VERSION:  "3.11"
+      DATASET_NAME:    "iris"
+      API_TOKEN:       ${{ secrets.API_TOKEN }}
+      TARGET_ENV:      ${{ github.event_name == 'workflow_dispatch' && inputs.target_env || 'dev' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Debug env
+        run: |
+          echo "TARGET_ENV: $TARGET_ENV"
+          echo "APP_NAME: $APP_NAME"
+          echo "MODEL_STORAGE: $MODEL_STORAGE"
+          echo "Secret length (masked): ${#API_TOKEN}"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install -U pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Lint (flake8 - soft)
+        run: flake8 --exit-zero src tests
+
+      - name: Format check (black - soft)
+        run: black --check src tests || true
+
+      - name: Ensure PYTHONPATH includes repo root
+        run: echo "PYTHONPATH=${PYTHONPATH}:$GITHUB_WORKSPACE" >> $GITHUB_ENV
+
+      - name: Run tests
+        run: PYTHONPATH=$PYTHONPATH:. python -m pytest -q
+
+      - name: Train and save model
+        run: |
+          python - << 'PY'
+          import os
+          from joblib import dump
+          from src.data import get_data
+          from src.model import train_model
+
+          storage = os.getenv('MODEL_STORAGE', 'outputs')
+          os.makedirs(storage, exist_ok=True)
+
+          env = os.getenv('TARGET_ENV', 'dev')
+          app = os.getenv('APP_NAME', 'app')
+
+          X_train, X_test, y_train, y_test = get_data()
+          model = train_model(X_train, y_train)
+          path = os.path.join(storage, f"model_{app}_{env}.joblib")
+          dump(model, path)
+          print(f"Model saved to {path}")
+          PY
+
+      - name: Upload model artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-${{ env.TARGET_ENV }}
+          path: ${{ env.MODEL_STORAGE }}/model_${{ env.APP_NAME }}_${{ env.TARGET_ENV }}.joblib
