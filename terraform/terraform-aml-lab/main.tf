@@ -33,7 +33,7 @@ data "azurerm_subscription" "current" {}
 # ---- Lokalne nazwy zasobów ----
 locals {
   student_id    = "50539" # <<< WPISZ SWÓJ NUMER INDEKSU
-  location      = "swedencentral"
+  location      = "norwayeast"
   rg_name       = "rg-aml-${local.student_id}"
   sa_name       = "stor${local.student_id}"
   kv_name       = "kv${local.student_id}"
