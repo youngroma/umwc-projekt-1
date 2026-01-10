@@ -1,0 +1,21 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
+type: command
+
+display_name: aml02-sklearn-training-job
+experiment_name: aml02-training
+
+code: .
+command: >
+  python src/train.py
+  --data ${{inputs.training_data}}
+
+environment: azureml://registries/azureml/environments/sklearn-1.5/versions/34
+compute: azureml:cpu-cluster-50539
+
+inputs:
+  training_data:
+    type: uri_file
+    path: azureml:demo-data-50539@latest
+
+limits:
+  timeout: 3600

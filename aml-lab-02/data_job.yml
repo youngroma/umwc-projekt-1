@@ -1,0 +1,13 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
+type: command
+display_name: aml02-data-prep-job
+experiment_name: aml02-data-prep
+
+code: .
+command: python src/data_prep.py
+
+environment: azureml://registries/azureml/environments/sklearn-1.5/versions/34
+compute: azureml:cpu-cluster-50539
+
+limits:
+  timeout: 3600
